@@ -1,0 +1,7 @@
+// hides visually and keeps on disk
+{
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/venv": true
+  }
+}
