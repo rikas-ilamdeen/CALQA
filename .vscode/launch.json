@@ -1,0 +1,11 @@
+{
+  "configurations": [
+    {
+      "name": "Run CALQA",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "src.main",
+      "console": "integratedTerminal"
+    }
+  ]
+}
