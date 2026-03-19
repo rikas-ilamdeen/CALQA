@@ -1,7 +1,9 @@
 from model.image_loader import load_image
 from model.preprocessing import to_grayscale
-from model.cpu.log_cpu import apply_log
-from model.cpu.dog_cpu import apply_dog
+from model.cpu.log_cpu import apply_log as apply_log_cpu
+from model.cpu.dog_cpu import apply_dog as apply_dog_cpu
+from model.gpu.log_gpu import apply_log as apply_log_gpu
+from model.gpu.dog_gpu import apply_dog as apply_dog_gpu
 from model.timer import Timer
 from model.project_manager import ProjectManager
 from typing import Optional
@@ -38,20 +40,41 @@ class AppController:
     def process(self, method):
         """Process image with selected method.
 
-        Supports both the legacy method names ("LoG", "DoG") and the
-        new project method naming ("CPU_LoG", "CPU_DoG").
+        Supports CPU and GPU methods with naming like:
+        - "CPU_LoG", "CPU_DoG" (CPU processing)
+        - "GPU_LoG", "GPU_DoG" (GPU processing)
+        - Legacy: "LoG", "DoG" (defaults to CPU)
 
         Args:
-            method: "CPU_LoG", "CPU_DoG", "LoG", or "DoG".
+            method: Method name including device prefix.
         """
-        # Normalize method names to the core algorithm
+        # Parse device and algorithm from method name
+        device = "CPU"  # default
         alg = None
+
         if method is None:
             alg = None
-        elif method.upper().endswith("LOG"):
-            alg = "LoG"
-        elif method.upper().endswith("DOG"):
-            alg = "DoG"
+        elif method.upper().startswith("GPU_"):
+            device = "GPU"
+            filter_part = method[4:]  # Remove "GPU_" prefix
+            if filter_part.upper() == "LOG":
+                alg = "LoG"
+            elif filter_part.upper() == "DOG":
+                alg = "DoG"
+        elif method.upper().startswith("CPU_"):
+            device = "CPU"
+            filter_part = method[4:]  # Remove "CPU_" prefix
+            if filter_part.upper() == "LOG":
+                alg = "LoG"
+            elif filter_part.upper() == "DOG":
+                alg = "DoG"
+        else:
+            # Legacy support
+            device = "CPU"
+            if method.upper() == "LOG":
+                alg = "LoG"
+            elif method.upper() == "DOG":
+                alg = "DoG"
 
         # Measure time
         with Timer() as t:
@@ -61,13 +84,21 @@ class AppController:
             # Convert to grayscale (required for edge detection)
             gray = to_grayscale(image)
 
-            # Select CPU-based filter
-            if alg == "LoG":
-                output = apply_log(gray)
-            elif alg == "DoG":
-                output = apply_dog(gray)
-            else:
-                output = gray
+            # Select appropriate filter based on device and algorithm
+            if device == "GPU":
+                if alg == "LoG":
+                    output = apply_log_gpu(gray)
+                elif alg == "DoG":
+                    output = apply_dog_gpu(gray)
+                else:
+                    output = gray
+            else:  # CPU
+                if alg == "LoG":
+                    output = apply_log_cpu(gray)
+                elif alg == "DoG":
+                    output = apply_dog_cpu(gray)
+                else:
+                    output = gray
 
             # Store result
             self.image = output
@@ -83,13 +114,13 @@ class AppController:
         if hasattr(self.view, "show_time"):
             self.view.show_time(t.elapsed_ms)
 
-    def batch_process_folder(self, folder_path, method="LoG"):
+    def batch_process_folder(self, folder_path, method="CPU_LoG"):
         """
         Process all images in a folder.
 
         Args:
             folder_path: Path to folder containing images
-            method: "LoG" or "DoG"
+            method: Method name like "CPU_LoG", "GPU_DoG", etc.
 
         Returns:
             List of results with metadata

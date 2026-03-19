@@ -135,12 +135,9 @@ class ProjectController:
         try:
             image_path = self.current_main_window.current_image_path
 
-            # Use AppController to process (method is like "CPU_LoG" or "CPU_DoG")
+            # Use AppController to process (method includes device prefix like "GPU_LoG")
             self.app_controller.load_image(image_path)
-
-            # Determine filter part for processing
-            _, filter_name = method.split("_", 1)
-            self.app_controller.process(filter_name)
+            self.app_controller.process(method)
 
             # Display result
             if self.app_controller.image is not None:
@@ -176,8 +173,6 @@ class ProjectController:
             results = []
             total_time = 0.0
 
-            _, filter_name = method.split("_", 1)
-
             for idx, image_file in enumerate(image_files):
                 # Update progress
                 progress = int((idx / len(image_files)) * 100)
@@ -187,7 +182,7 @@ class ProjectController:
                 try:
                     # Process image
                     self.app_controller.load_image(str(image_file))
-                    self.app_controller.process(filter_name)
+                    self.app_controller.process(method)
 
                     # Save output image
                     output_path = self.project_manager.save_output_image(

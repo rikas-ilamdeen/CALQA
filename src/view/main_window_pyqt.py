@@ -127,8 +127,7 @@ class MainWindowPyQt(QMainWindow):
         self.device_group = QButtonGroup()
         cpu_radio = QRadioButton("CPU")
         cpu_radio.setChecked(True)
-        gpu_radio = QRadioButton("GPU (Coming Soon)")
-        gpu_radio.setEnabled(False)
+        gpu_radio = QRadioButton("GPU")
 
         self.device_group.addButton(cpu_radio, 0)
         self.device_group.addButton(gpu_radio, 1)
@@ -213,8 +212,7 @@ class MainWindowPyQt(QMainWindow):
         self.batch_device_group = QButtonGroup()
         batch_cpu_radio = QRadioButton("CPU")
         batch_cpu_radio.setChecked(True)
-        batch_gpu_radio = QRadioButton("GPU (Coming Soon)")
-        batch_gpu_radio.setEnabled(False)
+        batch_gpu_radio = QRadioButton("GPU")
         self.batch_device_group.addButton(batch_cpu_radio, 0)
         self.batch_device_group.addButton(batch_gpu_radio, 1)
 
