@@ -237,14 +237,15 @@ def apply_dog(image):
 
         print(f"? GPU RUN: {cuda.get_current_device().name} | Time: {elapsed_ms:.1f}ms | Speedup vs CPU: {speedup:.1f}x")
 
-        return result[0] if image.ndim == 2 else result
+        final_result = result[0] if image.ndim == 2 else result
+        return (final_result, elapsed_ms)
 
     except Exception as e:
         warnings.warn(f"GPU processing failed ({e}), falling back to CPU", UserWarning)
         if CPU_FALLBACK_AVAILABLE:
             if image.ndim == 2:
-                return apply_dog_cpu(image)
+                return (apply_dog_cpu(image), None)
             else:
-                return np.stack([apply_dog_cpu(img) for img in image])
+                return (np.stack([apply_dog_cpu(img) for img in image]), None)
         else:
             raise RuntimeError(f"GPU processing failed and no CPU fallback available: {e}")

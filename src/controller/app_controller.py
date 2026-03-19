@@ -85,11 +85,12 @@ class AppController:
             gray = to_grayscale(image)
 
             # Select appropriate filter based on device and algorithm
+            gpu_kernel_time = None
             if device == "GPU":
                 if alg == "LoG":
-                    output = apply_log_gpu(gray)
+                    output, gpu_kernel_time = apply_log_gpu(gray)
                 elif alg == "DoG":
-                    output = apply_dog_gpu(gray)
+                    output, gpu_kernel_time = apply_dog_gpu(gray)
                 else:
                     output = gray
             else:  # CPU
@@ -108,7 +109,11 @@ class AppController:
                 self.view.show_result(output)
 
         # Store processing time
-        self._last_processing_time = t.elapsed_ms
+        # For GPU: use kernel time only; for CPU or fallback: use full time
+        if gpu_kernel_time is not None:
+            self._last_processing_time = gpu_kernel_time
+        else:
+            self._last_processing_time = t.elapsed_ms
 
         # Show time (for Tkinter views)
         if hasattr(self.view, "show_time"):

@@ -89,13 +89,14 @@ def apply_log(gray):
 
         cpu_ms = _get_cpu_baseline_ms(gray)
         speedup = cpu_ms / elapsed_ms if elapsed_ms > 0 else float('inf')
-        print(f"✅ GPU RUN: {cuda.get_current_device().name} | Time: {elapsed_ms:.1f}ms | Speedup vs CPU: {speedup:.1f}x")
+        print(f"[GPU LoG] Time: {elapsed_ms:.1f}ms | Speedup vs CPU: {speedup:.1f}x")
 
-        return rescale_intensity(host_pinned, in_range='image', out_range=(0, 1))
+        result = rescale_intensity(host_pinned, in_range='image', out_range=(0, 1))
+        return (result, elapsed_ms)
 
     except Exception as e:
         warnings.warn(f"GPU processing failed ({e}), falling back to CPU", UserWarning)
         if CPU_FALLBACK_AVAILABLE:
-            return apply_log_cpu(gray)
+            return (apply_log_cpu(gray), None)
         else:
             raise RuntimeError(f"GPU processing failed and no CPU fallback available: {e}")
