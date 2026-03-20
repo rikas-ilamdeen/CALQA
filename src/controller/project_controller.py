@@ -10,6 +10,8 @@ from typing import Optional
 import json
 
 from model.project_manager import ProjectManager
+from model import feature_extractor
+from model.ssim_validator import compute_ssim
 from view.welcome_screen import WelcomeScreen
 from view.new_project_dialog import NewProjectDialog
 from view.main_window_pyqt import MainWindowPyQt
@@ -118,6 +120,9 @@ class ProjectController:
         self.current_main_window.benchmark_compare_clicked.connect(
             self.on_benchmark_compare_clicked
         )
+        self.current_main_window.validate_ssim_clicked.connect(
+            self.on_validate_ssim_clicked
+        )
 
         # Load and display results
         self._update_results_display()
@@ -180,16 +185,20 @@ class ProjectController:
                 QApplication.processEvents()
 
                 try:
-                    # Process image
+                    # Process image with selected method
                     self.app_controller.load_image(str(image_file))
                     self.app_controller.process(method)
+                    output = self.app_controller.image
 
                     # Save output image
                     output_path = self.project_manager.save_output_image(
-                        method, str(image_file), self.app_controller.image
+                        method, str(image_file), output
                     )
 
-                    # Record result
+                    # --- Feature extraction ---
+                    features = feature_extractor.extract(output)
+
+                    # Record display row
                     results.append(
                         [
                             image_file.name,
@@ -200,7 +209,7 @@ class ProjectController:
                     )
                     total_time += self.app_controller._last_processing_time
 
-                    # Save result metadata
+                    # Save result metadata (including features)
                     self.project_manager.save_result(
                         {
                             "method": method,
@@ -208,20 +217,23 @@ class ProjectController:
                             "output_file": output_path or "",
                             "processing_time_ms": self.app_controller._last_processing_time,
                             "status": "success",
+                            "vein_density": features["vein_density"],
+                            "edge_count": features["edge_count"],
+                            "ssim_score": None,
                         }
                     )
 
                 except Exception as e:
                     results.append([image_file.name, method, "—", f"Error: {str(e)[:20]}"])
 
-            # Update table
+            # Update batch table
             self.current_main_window.update_batch_table(results)
             self.current_main_window.batch_progress.setValue(100)
             self.current_main_window.set_status_message(
                 f"Batch processing complete. Total time: {total_time:.2f} ms"
             )
 
-            # Update Results tab with batch results
+            # Refresh Results tab
             self._update_results_display()
 
         except Exception as e:
@@ -257,26 +269,110 @@ class ProjectController:
             QMessageBox.critical(self.current_main_window, "Error", f"Export failed: {e}")
 
     def _update_results_display(self):
-        """Update the results table in main window."""
+        """Update the pivot results table — one row per filename, one col per method."""
         results = self.project_manager.get_results()
 
-        if results:
-            table_data = [
-                [
-                    Path(r.get("input_file", "")).name,
-                    r.get("method", "—"),
-                    f"{r.get('processing_time_ms', 0):.2f}",
-                ]
-                for r in results
-            ]
-            self.current_main_window.update_results_table(table_data)
-
-            # Update available methods for benchmark comparison
-            methods = sorted({r.get("method") for r in results if r.get("method")})
-            self.current_main_window.set_benchmark_methods(methods)
-        else:
+        if not results:
             self.current_main_window.update_results_table([])
             self.current_main_window.set_benchmark_methods([])
+            return
+
+        # --- Pivot: group by filename ---
+        # pivot[fname][method] = result dict
+        METHODS = ["CPU_LoG", "CPU_DoG", "GPU_LoG", "GPU_DoG"]
+        pivot = {}
+        for r in results:
+            fname = Path(r.get("input_file", "")).name
+            method = r.get("method", "")
+            if fname not in pivot:
+                pivot[fname] = {}
+            pivot[fname][method] = r
+
+        table_data = []
+        for fname in sorted(pivot.keys()):
+            row_data = pivot[fname]
+
+            # Time for each of the four fixed methods
+            method_cells = []
+            for m in METHODS:
+                if m in row_data:
+                    t = row_data[m].get("processing_time_ms", 0)
+                    method_cells.append(f"{t:.2f}")
+                else:
+                    method_cells.append("—")
+
+            # SSIM — prefer from any DoG result that has it
+            ssim_val = None
+            for m in ["CPU_DoG", "GPU_DoG"]:
+                if m in row_data and row_data[m].get("ssim_score") is not None:
+                    ssim_val = row_data[m]["ssim_score"]
+                    break
+            ssim_str = f"{ssim_val:.4f}" if ssim_val is not None else "N/A"
+
+            # Density % — prefer GPU_DoG > CPU_DoG > GPU_LoG > CPU_LoG
+            density_val = None
+            for m in ["GPU_DoG", "CPU_DoG", "GPU_LoG", "CPU_LoG"]:
+                if m in row_data and row_data[m].get("vein_density") is not None:
+                    density_val = row_data[m]["vein_density"]
+                    break
+            density_str = f"{density_val:.2f}" if density_val is not None else "N/A"
+
+            table_data.append([fname] + method_cells + [ssim_str, density_str])
+
+        self.current_main_window.update_results_table(table_data)
+
+        # Update available methods for benchmark comparison
+        methods = sorted({r.get("method") for r in results if r.get("method")})
+        self.current_main_window.set_benchmark_methods(methods)
+
+
+    def on_validate_ssim_clicked(self):
+        """On-demand SSIM validation: re-processes each stored result with CPU_DoG
+        and GPU_DoG, computes SSIM, and updates project.json.
+        Only DoG results get a real SSIM score; LoG results stay N/A.
+        """
+        results = self.project_manager.get_results()
+        if not results:
+            QMessageBox.information(
+                self.current_main_window, "SSIM", "No results to validate."
+            )
+            return
+
+        self.current_main_window.set_status_message("Computing SSIM scores...")
+        QApplication.processEvents()
+
+        updated = 0
+        for r in results:
+            method = r.get("method", "")
+            input_file = r.get("input_file", "")
+
+            # Only compute SSIM for DoG methods
+            if "DoG" not in method:
+                continue
+
+            try:
+                # Run CPU_DoG
+                self.app_controller.load_image(input_file)
+                self.app_controller.process("CPU_DoG")
+                cpu_out = self.app_controller.image
+
+                # Run GPU_DoG
+                self.app_controller.load_image(input_file)
+                self.app_controller.process("GPU_DoG")
+                gpu_out = self.app_controller.image
+
+                score = compute_ssim(cpu_out, gpu_out)
+                r["ssim_score"] = score
+                self.project_manager.save_result(r)
+                updated += 1
+
+            except Exception as e:
+                print(f"[SSIM] Skipping {input_file}: {e}")
+
+        self._update_results_display()
+        self.current_main_window.set_status_message(
+            f"SSIM validation complete. Updated {updated} result(s)."
+        )
 
     def on_benchmark_compare_clicked(self, method1: str, method2: str):
         """Compare two methods using stored results."""

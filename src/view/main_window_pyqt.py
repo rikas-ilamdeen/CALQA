@@ -35,10 +35,11 @@ class MainWindowPyQt(QMainWindow):
     """
 
     # Signals for controller communication
-    compute_clicked = pyqtSignal(str)  # method: "CPU_LoG", "CPU_DoG", etc.
-    batch_process_clicked = pyqtSignal(str, str)  # folder_path, method
-    export_results_clicked = pyqtSignal(str)  # format: "csv" or "json"
+    compute_clicked = pyqtSignal(str)          # method: "CPU_LoG", "CPU_DoG", etc.
+    batch_process_clicked = pyqtSignal(str, str)   # folder_path, method
+    export_results_clicked = pyqtSignal(str)       # file path
     benchmark_compare_clicked = pyqtSignal(str, str)  # method1, method2
+    validate_ssim_clicked = pyqtSignal()           # on-demand SSIM validation
 
     def __init__(self, project_data: Dict, theme: str = "light"):
         super().__init__()
@@ -257,33 +258,41 @@ class MainWindowPyQt(QMainWindow):
         widget = QWidget()
         layout = QVBoxLayout()
 
-        # Results table
+        # Results table — pivot: one row per filename, one col per method
         layout.addWidget(QLabel("Saved Results"))
         self.results_table = QTableWidget()
-        self.results_table.setColumnCount(3)
+        self.results_table.setColumnCount(7)
         self.results_table.setHorizontalHeaderLabels(
-            ["Filename", "Method", "Time (ms)"]
+            ["Filename", "CPU_LoG (ms)", "CPU_DoG (ms)", "GPU_LoG (ms)", "GPU_DoG (ms)", "SSIM", "Density %"]
         )
         self.results_table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.results_table)
 
-        # Export buttons
-        export_layout = QHBoxLayout()
-        export_layout.addStretch()
+        # Action buttons row
+        action_layout = QHBoxLayout()
+
+        ssim_btn = QPushButton("Validate Accuracy (SSIM)")
+        ssim_btn.setToolTip(
+            "Re-process each result with CPU DoG + GPU DoG and compute SSIM score"
+        )
+        ssim_btn.clicked.connect(lambda: self.validate_ssim_clicked.emit())
+        action_layout.addWidget(ssim_btn)
+
+        action_layout.addStretch()
 
         csv_btn = QPushButton("Export as CSV")
         csv_btn.clicked.connect(lambda: self._on_export_clicked("csv"))
-        export_layout.addWidget(csv_btn)
+        action_layout.addWidget(csv_btn)
 
         json_btn = QPushButton("Export as JSON")
         json_btn.clicked.connect(lambda: self._on_export_clicked("json"))
-        export_layout.addWidget(json_btn)
+        action_layout.addWidget(json_btn)
 
         delete_btn = QPushButton("Delete Selected")
         delete_btn.clicked.connect(self._on_delete_result_clicked)
-        export_layout.addWidget(delete_btn)
+        action_layout.addWidget(delete_btn)
 
-        layout.addLayout(export_layout)
+        layout.addLayout(action_layout)
 
         widget.setLayout(layout)
         return widget
