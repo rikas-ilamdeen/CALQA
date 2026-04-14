@@ -4,11 +4,15 @@ Manages project metadata, results storage, and project workflows
 """
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from PIL import Image
+
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectManager:
@@ -84,7 +88,7 @@ class ProjectManager:
 
             return True
         except Exception as e:
-            print(f"Error creating project: {e}")
+            logger.error("Error creating project: %s", e)
             return False
 
     def load_project(self, project_json_path: str) -> bool:
@@ -100,7 +104,7 @@ class ProjectManager:
             self.project_path = json_file
             return True
         except Exception as e:
-            print(f"Error loading project: {e}")
+            logger.error("Error loading project: %s", e)
             return False
 
     def _get_project_root(self) -> Optional[Path]:
@@ -149,7 +153,7 @@ class ProjectManager:
             img.save(output_path)
             return str(output_path)
         except Exception as e:
-            print(f"Error saving output image: {e}")
+            logger.error("Error saving output image: %s", e)
             return None
 
     def _find_result_index(self, input_file: str, method: str) -> int:
@@ -185,7 +189,7 @@ class ProjectManager:
 
             return True
         except Exception as e:
-            print(f"Error saving result: {e}")
+            logger.error("Error saving result: %s", e)
             return False
 
     def get_results(self) -> List[Dict]:
@@ -226,7 +230,7 @@ class ProjectManager:
 
             return True
         except Exception as e:
-            print(f"Error exporting CSV: {e}")
+            logger.error("Error exporting CSV: %s", e)
             return False
 
     def export_results_json(self, output_path: str) -> bool:
@@ -244,7 +248,7 @@ class ProjectManager:
 
             return True
         except Exception as e:
-            print(f"Error exporting JSON: {e}")
+            logger.error("Error exporting JSON: %s", e)
             return False
 
     def delete_result(self, index: int) -> bool:
@@ -264,7 +268,7 @@ class ProjectManager:
                 return True
             return False
         except Exception as e:
-            print(f"Error deleting result: {e}")
+            logger.error("Error deleting result: %s", e)
             return False
 
     def clear_results(self) -> bool:
@@ -281,5 +285,5 @@ class ProjectManager:
 
             return True
         except Exception as e:
-            print(f"Error clearing results: {e}")
+            logger.error("Error clearing results: %s", e)
             return False

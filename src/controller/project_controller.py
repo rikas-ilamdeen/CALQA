@@ -3,6 +3,7 @@ Project Controller - High-level workflow controller for CALQA
 Manages project creation, loading, and main window lifecycle
 """
 
+import logging
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
 from pathlib import Path
 
@@ -15,10 +16,14 @@ from view.main_window_pyqt import MainWindowPyQt
 from controller.app_controller import AppController
 
 
+logger = logging.getLogger(__name__)
+
+
 class ProjectController:
     """
     High-level controller managing project workflows.
-    Orchestrates creation, loading, and UI transitions.
+    Orchestrates project lifecycle and UI transitions:
+    welcome -> create/open project -> main window operations.
     """
 
     def __init__(self, theme: str = "light"):
@@ -103,7 +108,7 @@ class ProjectController:
         self.app_controller = AppController(self.current_main_window)
         self.app_controller.project_manager = self.project_manager
 
-        # Connect signals
+        # Connect UI signals to controller handlers.
         self.current_main_window.compute_clicked.connect(
             self.on_compute_clicked
         )
@@ -265,7 +270,11 @@ class ProjectController:
             QMessageBox.critical(self.current_main_window, "Error", f"Export failed: {e}")
 
     def _update_results_display(self):
-        """Update the pivot results table — one row per filename, one col per method."""
+        """Refresh Results tab using a pivot layout.
+
+        Each row corresponds to one input file, with fixed columns for
+        CPU/GPU LoG/DoG timings plus SSIM and vein-density summaries.
+        """
         results = self.project_manager.get_results()
 
         if not results:
@@ -273,8 +282,7 @@ class ProjectController:
             self.current_main_window.set_benchmark_methods([])
             return
 
-        # --- Pivot: group by filename ---
-        # pivot[fname][method] = result dict
+        # Build pivot map: pivot[filename][method] = result_dict.
         METHODS = ["CPU_LoG", "CPU_DoG", "GPU_LoG", "GPU_DoG"]
         pivot = {}
         for r in results:
@@ -288,7 +296,7 @@ class ProjectController:
         for fname in sorted(pivot.keys()):
             row_data = pivot[fname]
 
-            # Time for each of the four fixed methods
+            # Collect times in the fixed column order used by the table.
             method_cells = []
             for m in METHODS:
                 if m in row_data:
@@ -297,7 +305,7 @@ class ProjectController:
                 else:
                     method_cells.append("—")
 
-            # SSIM — prefer from any DoG result that has it
+            # SSIM is meaningful for DoG CPU/GPU comparison.
             ssim_val = None
             for m in ["CPU_DoG", "GPU_DoG"]:
                 if m in row_data and row_data[m].get("ssim_score") is not None:
@@ -305,7 +313,7 @@ class ProjectController:
                     break
             ssim_str = f"{ssim_val:.4f}" if ssim_val is not None else "N/A"
 
-            # Density % — prefer GPU_DoG > CPU_DoG > GPU_LoG > CPU_LoG
+            # Prefer density from DoG first, then LoG as fallback.
             density_val = None
             for m in ["GPU_DoG", "CPU_DoG", "GPU_LoG", "CPU_LoG"]:
                 if m in row_data and row_data[m].get("vein_density") is not None:
@@ -363,7 +371,7 @@ class ProjectController:
                 updated += 1
 
             except Exception as e:
-                print(f"[SSIM] Skipping {input_file}: {e}")
+                logger.warning("[SSIM] Skipping %s: %s", input_file, e)
 
         self._update_results_display()
         self.current_main_window.set_status_message(

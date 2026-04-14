@@ -3,7 +3,11 @@ SSIM Validator - Structural Similarity Index between two segmented images
 Used to validate that GPU DoG output is numerically equivalent to CPU DoG output.
 """
 
+import logging
 import numpy as np
+
+
+logger = logging.getLogger(__name__)
 
 
 def compute_ssim(img_ref, img_cmp) -> float | None:
@@ -44,5 +48,5 @@ def compute_ssim(img_ref, img_cmp) -> float | None:
         return round(float(score), 4)
 
     except Exception as e:
-        print(f"[SSIM] Error computing SSIM: {e}")
+        logger.warning("[SSIM] Error computing SSIM: %s", e)
         return None
