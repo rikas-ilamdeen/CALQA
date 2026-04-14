@@ -11,9 +11,15 @@ from typing import Optional
 
 class AppController:
     """
-    Controller layer: coordinates data flow between View and Model
-    Supports both Tkinter (legacy) and PyQt6 (new) interfaces.
-    Manages image processing, timing, and project workflows.
+    Controller layer coordinating View <-> Model data flow.
+
+    Primarily used by the PyQt6 interface, with compatibility hooks
+    for views exposing `show_result` and `show_time` methods.
+    Main responsibilities:
+    - load input images
+    - run selected CPU/GPU algorithm
+    - keep last processing time
+    - provide batch processing utilities
     """
 
     def __init__(self, view):
@@ -33,7 +39,7 @@ class AppController:
         self.image_path = path
         self.image = load_image(path)
 
-        # For PyQt6 views with show_result method
+        # Compatibility hook for views that can preview loaded images.
         if hasattr(self.view, "show_result"):
             self.view.show_result(self.image)
 
@@ -48,7 +54,7 @@ class AppController:
         Args:
             method: Method name including device prefix.
         """
-        # Parse device and algorithm from method name
+        # 1) Parse method string into device + algorithm.
         device = "CPU"  # default
         alg = None
 
@@ -76,7 +82,7 @@ class AppController:
             elif method.upper() == "DOG":
                 alg = "DoG"
 
-        # Measure time
+        # 2) Run the processing pipeline and measure total elapsed time.
         with Timer() as t:
             # Reload image
             image = load_image(self.image_path)
@@ -84,7 +90,7 @@ class AppController:
             # Convert to grayscale (required for edge detection)
             gray = to_grayscale(image)
 
-            # Select appropriate filter based on device and algorithm
+            # 3) Execute selected implementation (CPU or GPU).
             gpu_kernel_time = None
             if device == "GPU":
                 if alg == "LoG":
@@ -104,18 +110,17 @@ class AppController:
             # Store result
             self.image = output
 
-            # Display result (for Tkinter views)
+            # Compatibility hook for views that display processed output.
             if hasattr(self.view, "show_result"):
                 self.view.show_result(output)
 
-        # Store processing time
-        # For GPU: use kernel time only; for CPU or fallback: use full time
+        # 4) Store timing: GPU returns kernel time; CPU uses full elapsed time.
         if gpu_kernel_time is not None:
             self._last_processing_time = gpu_kernel_time
         else:
             self._last_processing_time = t.elapsed_ms
 
-        # Show time (for Tkinter views)
+        # Compatibility hook for views that display processing time.
         if hasattr(self.view, "show_time"):
             self.view.show_time(t.elapsed_ms)
 
@@ -135,7 +140,7 @@ class AppController:
         results = []
         folder = Path(folder_path)
 
-        # Find all image files
+        # Collect supported image files from folder.
         image_files = list(folder.glob("*.jpg")) + list(folder.glob("*.png"))
 
         for image_file in image_files:

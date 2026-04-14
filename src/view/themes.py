@@ -3,8 +3,6 @@ Theme Manager - Provides light and dark theme stylesheets for PyQt6
 CALQA uses purple accents (#8B5CF6) for University of Westminster branding
 """
 
-from typing import Optional
-
 # Purple accent color for CALQA branding
 PRIMARY_COLOR = "#8B5CF6"
 PRIMARY_DARK = "#6B21A8"
