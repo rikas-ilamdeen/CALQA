@@ -151,7 +151,9 @@ def _subtract_batch(d_g1, d_g2, d_out, height, width, batch_size):
 
 def _warmup_gpu():
     try:
-        h, w, batch = 64, 64, 2
+        # Use a larger warm-up launch so Numba doesn't flag low-occupancy grids.
+        # This compiles kernels once at startup with realistic image dimensions.
+        h, w, batch = 256, 256, 8
         dummy = np.zeros((batch, h, w), dtype=np.float32)
         d_in = cuda.to_device(dummy)
         d_tmp = cuda.device_array_like(d_in)
