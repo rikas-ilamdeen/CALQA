@@ -21,10 +21,10 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QPixmap, QImage
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QPixmap, QImage
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 from view.themes import apply_theme
 

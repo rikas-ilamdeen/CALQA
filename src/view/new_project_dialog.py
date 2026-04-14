@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QFileDialog,
 )
-from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QFont
 from pathlib import Path
 from typing import Optional, Dict
@@ -117,25 +117,6 @@ class NewProjectDialog(QDialog):
         )
         if folder:
             self.folder_input.setText(folder)
-
-    def browse_images(self):
-        """Open file/folder browser for training images."""
-        # First try to browse for a directory
-        folder = QFileDialog.getExistingDirectory(
-            self, "Select Training Images Folder", str(Path.home())
-        )
-        if folder:
-            self.images_input.setText(folder)
-        else:
-            # If user cancels, offer to select a file
-            file_path, _ = QFileDialog.getOpenFileName(
-                self,
-                "Select Training Image File",
-                str(Path.home()),
-                "Image Files (*.jpg *.jpeg *.png *.bmp);;All Files (*)",
-            )
-            if file_path:
-                self.images_input.setText(file_path)
 
     def on_finish_clicked(self):
         """Validate and create project."""

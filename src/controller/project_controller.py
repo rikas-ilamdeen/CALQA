@@ -4,10 +4,7 @@ Manages project creation, loading, and main window lifecycle
 """
 
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
-from PyQt6.QtCore import QThread
 from pathlib import Path
-from typing import Optional
-import json
 
 from model.project_manager import ProjectManager
 from model import feature_extractor
@@ -15,7 +12,6 @@ from model.ssim_validator import compute_ssim
 from view.welcome_screen import WelcomeScreen
 from view.new_project_dialog import NewProjectDialog
 from view.main_window_pyqt import MainWindowPyQt
-from view.themes import apply_theme
 from controller.app_controller import AppController
 
 
