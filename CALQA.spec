@@ -3,14 +3,14 @@
 
 a = Analysis(
     ['src\\main.py'],
-    pathex=[],
+    pathex=['src'],
     binaries=[],
     datas=[],
     hiddenimports=['PyQt6.QtCore', 'PyQt6.QtGui', 'PyQt6.QtWidgets', 'PyQt6.sip', 'numba.cuda', 'numba.cuda.cudadrv.driver', 'numba.cuda.cudadrv.devices', 'numba.cuda.cudadrv.runtime', 'numba.cuda.cudadrv.libs'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['cupy', 'cupy_backends', 'cv2', 'matplotlib', 'tkinter', 'numba.np.ufunc.tbbpool', 'numba.tests', 'numba.cuda.tests'],
     noarchive=False,
     optimize=0,
 )
