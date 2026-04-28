@@ -1,3 +1,14 @@
+"""
+Mid-level processing controller between UI and model functions
+
+for views exposing `show_result` and `show_time` methods.
+Main responsibilities:
+- load input images
+- run selected CPU/GPU algorithm
+- keep last processing time
+- provide batch processing utilities
+"""
+
 from model.image_loader import load_image
 from model.preprocessing import to_grayscale
 from model.cpu.log_cpu import apply_log as apply_log_cpu
@@ -8,20 +19,7 @@ from model.timer import Timer
 from model.project_manager import ProjectManager
 from typing import Optional
 
-
 class AppController:
-    """
-    Controller layer coordinating View <-> Model data flow.
-
-    Primarily used by the PyQt6 interface, with compatibility hooks
-    for views exposing `show_result` and `show_time` methods.
-    Main responsibilities:
-    - load input images
-    - run selected CPU/GPU algorithm
-    - keep last processing time
-    - provide batch processing utilities
-    """
-
     def __init__(self, view):
         self.view = view
         self.image_path = None

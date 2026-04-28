@@ -1,7 +1,9 @@
 """CPU baseline implementation of Laplacian of Gaussian (LoG).
 
-This module provides a mathematically explicit LoG pipeline that is useful
-for explaining the algorithm in viva and for comparing with GPU output.
+Gaussian Blur + Laplacian
+Used to highlight leaf vein structures and detect edges
+    1. Blur the image to remove noise
+    2. Find edges using the Laplacian
 """
 
 import numpy as np
@@ -10,7 +12,7 @@ from skimage.exposure import rescale_intensity
 
 
 def log_kernel(size, sigma):
-    """Generate an analytic 2D LoG kernel.
+    """Generate an analytic 2D LoG kernel mathematically.
 
     Args:
         size: Kernel width/height (odd integer)

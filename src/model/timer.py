@@ -1,5 +1,6 @@
 import time
 
+# Measure execution time
 class Timer:
     def __enter__(self):
         self.start = time.perf_counter()

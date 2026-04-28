@@ -1,6 +1,6 @@
 """
 Main Window (PyQt6) - Multi-tab interface for CALQA project workflow
-Tabs: Dashboard, Segmentation, Batch Benchmark, Results
+Tabs: segmentation, batch processing, results, benchmark
 """
 
 from PyQt6.QtWidgets import (
