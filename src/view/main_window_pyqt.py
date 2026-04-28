@@ -263,7 +263,7 @@ class MainWindowPyQt(QMainWindow):
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(7)
         self.results_table.setHorizontalHeaderLabels(
-            ["Filename", "CPU_LoG (ms)", "CPU_DoG (ms)", "GPU_LoG (ms)", "GPU_DoG (ms)", "SSIM", "Density %"]
+            ["Filename", "CPU_LoG (ms)", "CPU_DoG (ms)", "GPU_LoG (ms)", "GPU_DoG (ms)", "SSIM", "Density"]
         )
         self.results_table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.results_table)
