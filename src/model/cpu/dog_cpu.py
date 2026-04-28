@@ -3,6 +3,12 @@
 This module is used as:
 1) a reference output for algorithm validation,
 2) a fallback when GPU execution is unavailable.
+
+Gaussian(g1) - Gaussian(g2)
+Used to highlights structure differences (edges or veins)
+Faster and simpler than LoG
+    1. Blurring the image twice (with different levels)
+    2. Subtracting the two images
 """
 
 from skimage.filters import gaussian

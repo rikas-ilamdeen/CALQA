@@ -1,12 +1,11 @@
 """
 Feature Extractor - Extracts vein density features from a segmented leaf image.
 
-Operates on the DoG/LoG segmented output (float [0,1] or uint8 [0,255]).
+Operates on the DoG/LoG segmented output.
 All computation uses numpy only.
 """
 
 import numpy as np
-
 
 def extract(segmented_image) -> dict:
     """

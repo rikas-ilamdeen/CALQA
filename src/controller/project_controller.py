@@ -1,5 +1,5 @@
 """
-Project Controller - High-level workflow controller for CALQA
+Project Controller - High-level app workflow controller for CALQA
 Manages project creation, loading, and main window lifecycle
 """
 
@@ -15,9 +15,7 @@ from view.new_project_dialog import NewProjectDialog
 from view.main_window_pyqt import MainWindowPyQt
 from controller.app_controller import AppController
 
-
 logger = logging.getLogger(__name__)
-
 
 class ProjectController:
     """

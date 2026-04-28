@@ -2,6 +2,11 @@
 
 This module applies Laplacian of Gaussian (LoG) on a 2D grayscale image
 using a CUDA convolution kernel with a precomputed 9x9 LoG filter.
+
+Gaussian Blur + Laplacian
+Used to highlight leaf vein structures and detect edges
+    1. Blur the image to remove noise
+    2. Find edges using the Laplacian
 """
 
 import time
@@ -14,14 +19,14 @@ import warnings
 
 logger = logging.getLogger(__name__)
 
-# CPU fallback keeps the application usable on systems without CUDA support.
+# CPU fallback keeps the application usable on systems without CUDA support
 try:
     from model.cpu.log_cpu import apply_log as apply_log_cpu
     CPU_FALLBACK_AVAILABLE = True
 except ImportError:
     CPU_FALLBACK_AVAILABLE = False
 
-# Single LoG kernel computed on CPU and cached for reuse.
+# Single LoG kernel computed on CPU and cached for reuse (Creates a 9×9 LoG filter)
 def _build_log_kernel(size=9, sigma=1.4):
     """Build analytic LoG kernel and center it to near-zero mean."""
     center = size // 2
@@ -51,7 +56,7 @@ def _get_log_kernel_device():
 
 @cuda.jit
 def _convolve_2d(image, kernel, output, height, width):
-    """Direct 2D convolution kernel for LoG filtering."""
+    """Direct 2D convolution kernel for LoG filtering (Each thread computes one pixel)."""
     x, y = cuda.grid(2)
     size = 9
     center = 4
@@ -82,7 +87,7 @@ def apply_log(gray):
         host_pinned = cuda.pinned_array((height, width), dtype=np.float32)
         np.copyto(host_pinned, gray.astype(np.float32))
 
-        # Allocate device input/output arrays and fetch cached LoG kernel.
+        # Allocate device input/output arrays and fetch cached LoG kernel (Transfer to GPU).
         d_image = cuda.to_device(host_pinned)
         d_output = cuda.device_array((height, width), dtype=np.float32)
         d_kernel = _get_log_kernel_device()
@@ -93,6 +98,7 @@ def apply_log(gray):
 
         # Measure kernel-only time for fair CPU/GPU comparison in UI.
         start = time.perf_counter()
+        # The convolution kernel runs in parallel, where each thread computes one pixel
         _convolve_2d[blocks, threads](d_image, d_kernel, d_output, height, width)
         cuda.synchronize()
 
@@ -103,6 +109,7 @@ def apply_log(gray):
         result = rescale_intensity(host_pinned, in_range='image', out_range=(0, 1))
         return (result, elapsed_ms)
 
+    #If GPU fails, the system falls back to CPU automatically
     except Exception as e:
         warnings.warn(f"GPU processing failed ({e}), falling back to CPU", UserWarning)
         if CPU_FALLBACK_AVAILABLE:

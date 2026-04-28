@@ -6,9 +6,7 @@ Used to validate that GPU DoG output is numerically equivalent to CPU DoG output
 import logging
 import numpy as np
 
-
 logger = logging.getLogger(__name__)
-
 
 def compute_ssim(img_ref, img_cmp) -> float | None:
     """

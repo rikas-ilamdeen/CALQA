@@ -11,9 +11,7 @@ from typing import Dict, List, Optional
 
 from PIL import Image
 
-
 logger = logging.getLogger(__name__)
-
 
 class ProjectManager:
     """

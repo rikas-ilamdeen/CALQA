@@ -6,6 +6,14 @@ Numba CUDA kernels. The pipeline is:
 2) Gaussian blur with sigma=2
 3) Subtract the two outputs on GPU
 4) Normalize result to [0, 1]
+
+Gaussian(g1) - Gaussian(g2)
+Used to highlights structure differences (edges or veins)
+Faster and simpler than LoG
+    1. Blurring the image twice (with different levels)
+    2. Subtracting the two images
+
+# high-performance separable-Gaussian DoG on CUDA with shared memory, pinned host arrays, batch support, and CPU fallback
 """
 
 import time
@@ -34,10 +42,10 @@ MAX_RADIUS = 6
 SHARED_WIDTH = BLOCK_X + 2 * MAX_RADIUS
 SHARED_HEIGHT = BLOCK_Y + 2 * MAX_RADIUS
 
-# Cached device/host buffers keyed by (batch_size, height, width).
+# Stores GPU memory to reuse, instead of allocating memory every time
 _gpu_buffers = {}
 
-# Precompute separable Gaussian vectors once to avoid repeated CPU work.
+# This function creates a 1D Gaussian kernel used for blurring the image. Sigma controls how much blur is applied
 def _make_gaussian_kernel(sigma):
     """Build a normalized 1D Gaussian kernel for separable convolution."""
     radius = int(3 * sigma)
@@ -46,6 +54,7 @@ def _make_gaussian_kernel(sigma):
     kernel /= kernel.sum()
     return kernel.astype(np.float32)
 
+# We use two kernels because DoG requires two different blur levels
 KERNEL1 = _make_gaussian_kernel(1.0)
 KERNEL2 = _make_gaussian_kernel(2.0)
 _RADIUS1 = (KERNEL1.size - 1) // 2
@@ -65,7 +74,7 @@ def _get_gpu_buffers(batch_size, height, width):
     """Get or allocate reusable pinned-host and device buffers for a shape."""
     key = (batch_size, height, width)
     if key not in _gpu_buffers:
-        # Pinned host memory speeds up host<->device transfer.
+        # Pinned host memory speeds up host(CPU) and device(GPU) transfer.
         host_pinned = cuda.pinned_array((batch_size, height, width), dtype=np.float32)
         _gpu_buffers[key] = {
             'host': host_pinned,
@@ -77,7 +86,10 @@ def _get_gpu_buffers(batch_size, height, width):
         }
     return _gpu_buffers[key]
 
-
+# Instead of applying a full 2D Gaussian filter
+# split it into horizontal and vertical passes
+# This reduces computation complexity and improves performance
+# Applies Gaussian blur row-wise, Uses shared memory (fast GPU memory)
 @cuda.jit
 def _horizontal_blur(d_in, d_out, height, width, batch_size, kernel, radius):
     """Apply one horizontal Gaussian pass using shared-memory tiling."""
@@ -124,7 +136,7 @@ def _horizontal_blur(d_in, d_out, height, width, batch_size, kernel, radius):
             acc += kernel[k] * shared[ty, tx + k]
         out_img[y, x] = acc
 
-
+# Applies Gaussian blur column-wise
 @cuda.jit
 def _vertical_blur(d_in, d_out, height, width, batch_size, kernel, radius):
     """Apply one vertical Gaussian pass using shared-memory tiling."""
@@ -171,7 +183,7 @@ def _vertical_blur(d_in, d_out, height, width, batch_size, kernel, radius):
             acc += kernel[k] * shared[ty + k, tx]
         out_img[y, x] = acc
 
-
+# This kernel subtracts the two blurred images pixel by pixel to produce the DoG result
 @cuda.jit
 def _subtract_batch(d_g1, d_g2, d_out, height, width, batch_size):
     """Element-wise subtraction: DoG = blur(sigma=1) - blur(sigma=2)."""
@@ -179,7 +191,7 @@ def _subtract_batch(d_g1, d_g2, d_out, height, width, batch_size):
     if bz < batch_size and x < width and y < height:
         d_out[bz, y, x] = d_g1[bz, y, x] - d_g2[bz, y, x]
 
-
+# First GPU run is slow (compilation)
 def _warmup_gpu():
     """Compile kernels once with a realistic launch size to reduce first-run latency."""
     try:
@@ -222,7 +234,7 @@ def apply_dog(image):
         tuple: (result_image_or_batch, kernel_time_ms)
     """
     try:
-        # Normalize input shape to a 3D batch for unified kernel launches.
+        # The function supports both single image and batch processing
         if image.ndim == 2:
             batch_input = image[np.newaxis, ...].astype(np.float32)
         elif image.ndim == 3:
@@ -230,7 +242,7 @@ def apply_dog(image):
         else:
             raise ValueError("Input image must be 2D or 3D grayscale stack")
 
-        # Reuse cached buffers for this shape to reduce allocation overhead.
+        # Reuses pre-allocated memory to improve performance
         batch_size, height, width = batch_input.shape
         buffers = _get_gpu_buffers(batch_size, height, width)
         host_pinned = buffers['host']
@@ -253,19 +265,21 @@ def apply_dog(image):
         d_kernel1 = _get_device_kernel(KERNEL1)
         d_kernel2 = _get_device_kernel(KERNEL2)
 
-        # Two separable Gaussian passes per sigma, then subtraction.
+        # Kernel Execution: Each pixel is processed in parallel across thousands of GPU threads
+        # Two separable Gaussian passes per sigma, then subtraction
         _horizontal_blur[blocks, threads](d_input, d_temp, height, width, batch_size, d_kernel1, _RADIUS1)
         _vertical_blur[blocks, threads](d_temp, d_g1, height, width, batch_size, d_kernel1, _RADIUS1)
         _horizontal_blur[blocks, threads](d_input, d_temp, height, width, batch_size, d_kernel2, _RADIUS2)
         _vertical_blur[blocks, threads](d_temp, d_g2, height, width, batch_size, d_kernel2, _RADIUS2)
         _subtract_batch[blocks, (BLOCK_X, BLOCK_Y, 1)](d_g1, d_g2, d_out, height, width, batch_size)
 
-        # Ensure GPU work is complete before measuring and copying output.
+        # Synchronization: Ensures all GPU operations are completed before measuring time
         cuda.synchronize()
 
+        # Measures GPU execution time for benchmarking
         elapsed_ms = (time.perf_counter() - start) * 1000.0
 
-        # Device -> Host transfer into pinned buffer.
+        # Device -> Host transfer into pinned buffer (Copy Back to CPU)
         d_out.copy_to_host(host_pinned)
 
         # Rescale each output image for consistent display/analysis.
@@ -273,10 +287,11 @@ def apply_dog(image):
         for i in range(batch_size):
             result[i] = rescale_intensity(host_pinned[i], in_range='image', out_range=(0, 1))
 
-        # Preserve original return shape for callers.
+        # Returns processed image and execution time
         final_result = result[0] if image.ndim == 2 else result
         return (final_result, elapsed_ms)
 
+    # If GPU fails, system automatically switches to CPU version, ensuring reliability
     except Exception as e:
         warnings.warn(f"GPU processing failed ({e}), falling back to CPU", UserWarning)
         if CPU_FALLBACK_AVAILABLE:

@@ -265,4 +265,3 @@ This makes the project useful not only for implementation, but also for reportin
 
 - The project uses a PyQt6-based interface, not Tkinter.
 - GPU features require a CUDA-capable NVIDIA GPU and compatible drivers.
-- The project is organized using MVC to keep the code easier to maintain and explain in viva or report writing.
